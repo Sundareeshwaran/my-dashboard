@@ -57,6 +57,7 @@ app.use(
       httpOnly: true,
       sameSite: isProduction ? "none" : "lax",
       secure: isProduction,
+      partitioned: isProduction,
       maxAge: 1000 * 60 * 60 * 24,
     },
   }),
@@ -75,6 +76,7 @@ const requireAuth = (req, res, next) => {
 };
 
 app.post("/api/auth/login", async (req, res) => {
+  res.set("Cache-Control", "no-store");
   const { user_name: userName, password } = req.body;
 
   if (!userName || !password) {
@@ -139,6 +141,7 @@ app.post("/api/auth/logout", (req, res) => {
 });
 
 app.get("/api/auth/me", requireAuth, (req, res) => {
+  res.set("Cache-Control", "no-store");
   res.json({ user: req.session.user });
 });
 
