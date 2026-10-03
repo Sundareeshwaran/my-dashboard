@@ -10,8 +10,10 @@ if (!connectionString) {
 
 const sql = postgres(connectionString, {
   ssl: process.env.NODE_ENV === "production" ? "require" : undefined,
+  prepare: false,
   max: 1,
   connect_timeout: 10,
+  idle_timeout: 20,
 });
 
 export default sql;
