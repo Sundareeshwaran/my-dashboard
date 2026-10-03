@@ -1,42 +1,24 @@
-import { useState, useEffect } from "react";
-import { supabase } from "../utils/supabase.js";
+import { useAuth } from "../auth/useAuth";
 
 const Users = () => {
-  const [users, setUsers] = useState([]);
-
-  useEffect(() => {
-    async function getUserList() {
-      const { data, error } = await supabase
-        .from("users")
-        .select("id, username:user_name");
-
-      if (error) {
-        console.error("Error fetching users:", error);
-        return;
-      }
-
-      if (data) {
-        setUsers(data);
-      }
-    }
-
-    getUserList();
-  }, [users]);
-
+  const { user, loading } = useAuth();
   return (
-    <div className="flex flex-col items-center">
-      <h1 className="text-5xl text-primary-foreground font-bold">
-        Welcome to the Users Page
-      </h1>
-
+    <div>
+      <div className="flex flex-col items-center">
+        <h1 className="text-5xl text-primary-foreground font-bold">
+          Welcome to the Users Page
+        </h1>
+      </div>
       <div className="mt-8">
-        {users.map((user) => (
-          <div key={user.id}>
-            <p className="text-2xl text-primary-foreground font-bold">
-              {user.username}
-            </p>
-          </div>
-        ))}
+        {loading ? (
+          <p>Loading...</p>
+        ) : (
+          user && (
+            <h1 className="max-w-md border rounded-md px-4 py-6 text-2xl font-bold bg-accent shadow-2xl">
+              {user.userName}
+            </h1>
+          )
+        )}
       </div>
     </div>
   );
