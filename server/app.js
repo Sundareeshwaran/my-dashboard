@@ -8,6 +8,7 @@ import sql from "./db/db.js";
 
 const app = express();
 const sessionSecret = process.env.SESSION_SECRET;
+const isProduction = process.env.NODE_ENV === "production";
 
 if (!sessionSecret) {
   throw new Error("SESSION_SECRET is not defined in the environment variables");
@@ -24,12 +25,13 @@ app.use(
 app.use(
   session({
     secret: sessionSecret,
+    proxy: isProduction,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      sameSite: isProduction ? "none" : "lax",
+      secure: isProduction,
       maxAge: 1000 * 60 * 60 * 24,
     },
   }),
@@ -64,15 +66,22 @@ app.post("/api/auth/login", async (req, res) => {
       LIMIT 1
     `;
 
-    if (!user || !(await bcrypt.compare(password, user.password))) {
+    if (
+      !user ||
+      typeof user.password !== "string" ||
+      !(await bcrypt.compare(password, user.password))
+    ) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
     req.session.user = { id: user.id, userName: user.user_name };
     res.json({ user: req.session.user });
   } catch (error) {
-    console.error("Failed to authenticate user.", error);
-    res.status(500).json({ error: "Authentication failed" });
+    console.error("Failed to authenticate user.", {
+      message: error instanceof Error ? error.message : String(error),
+      code: error?.code,
+    });
+    res.status(503).json({ error: "Authentication service unavailable" });
   }
 });
 
