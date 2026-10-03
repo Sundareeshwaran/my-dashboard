@@ -3,12 +3,21 @@ import express from "express";
 import process from "node:process";
 import cors from "cors";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import bcrypt from "bcrypt";
+import pg from "pg";
 import sql from "./db/db.js";
 
 const app = express();
 const sessionSecret = process.env.SESSION_SECRET;
 const isProduction = process.env.NODE_ENV === "production";
+const { Pool } = pg;
+const PgStore = connectPgSimple(session);
+const sessionPool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: isProduction ? { rejectUnauthorized: false } : undefined,
+  max: 1,
+});
 
 if (!sessionSecret) {
   throw new Error("SESSION_SECRET is not defined in the environment variables");
@@ -26,6 +35,11 @@ app.use(
   session({
     secret: sessionSecret,
     proxy: isProduction,
+    store: new PgStore({
+      pool: sessionPool,
+      tableName: "user_sessions",
+      createTableIfMissing: true,
+    }),
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -74,8 +88,24 @@ app.post("/api/auth/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    req.session.user = { id: user.id, userName: user.user_name };
-    res.json({ user: req.session.user });
+    req.session.regenerate((regenerateError) => {
+      if (regenerateError) {
+        console.error("Failed to create authentication session.", regenerateError);
+        return res.status(503).json({ error: "Authentication service unavailable" });
+      }
+
+      req.session.user = { id: user.id, userName: user.user_name };
+      req.session.save((saveError) => {
+        if (saveError) {
+          console.error("Failed to save authentication session.", saveError);
+          return res
+            .status(503)
+            .json({ error: "Authentication service unavailable" });
+        }
+
+        res.json({ user: req.session.user });
+      });
+    });
   } catch (error) {
     console.error("Failed to authenticate user.", {
       message: error instanceof Error ? error.message : String(error),
